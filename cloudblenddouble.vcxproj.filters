@@ -1,0 +1,191 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="cloud_grid.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="cloud_stamp_rot.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="file_helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="point_cloud_helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="string_helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="static.cpp">
+      <Filter>rpca\src</Filter>
+    </ClCompile>
+    <ClCompile Include="lzf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="pcd_helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="calculate_feature.cpp">
+      <Filter>rpca\src</Filter>
+    </ClCompile>
+    <ClCompile Include="extraction_tree.cpp">
+      <Filter>rpca\src</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="point_cloud_spliter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="main_blend.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="main_test.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="process_status.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="point_cloud_revert.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="point_type.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="kd_tree.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="macros.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="point_cloud.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="voxel_grid.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="cloud_grid.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="cloud_stamp_rot.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="file_helper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="point_cloud_helper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="cmm_types.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="string_helper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="static.h">
+      <Filter>rpca\include</Filter>
+    </ClInclude>
+    <ClInclude Include="channel_properties.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="conversions.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="file_io_helper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="for_each_type.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="lzf.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="pcd_helper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="pcl_config.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="pcl_exports.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="pcl_macros.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="point_traits.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="register_point_struct.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="sensor_image.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="sensor_point_cloud2.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="sensor_point_field.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="calculate_feature.h">
+      <Filter>rpca\include</Filter>
+    </ClInclude>
+    <ClInclude Include="data_struct.h">
+      <Filter>rpca\include</Filter>
+    </ClInclude>
+    <ClInclude Include="extraction_tree.h">
+      <Filter>rpca\include</Filter>
+    </ClInclude>
+    <ClInclude Include="concatenate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="point_cloud_spliter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="exception.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="process_status.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="point_cloud_revert.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{6300eaeb-0227-4bc8-a8bb-d00c7af8a439}</UniqueIdentifier>
+      <Extensions>cpp</Extensions>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{6b887c61-c3c1-4a7c-8db6-d12dcf27f615}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+    <Filter Include="rpca">
+      <UniqueIdentifier>{3cfdeb8a-f9f4-44a6-bfb9-facaba783ead}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rpca\src">
+      <UniqueIdentifier>{dbd2808e-aa68-464f-8a56-7ab66f2fc3dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rpca\include">
+      <UniqueIdentifier>{79204dfd-879d-4073-8260-49c58f049ce2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

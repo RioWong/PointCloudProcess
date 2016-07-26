@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{BBB50167-46F4-4951-A162-1CEAED2217FC}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>cloudblenddouble</RootNamespace>
+    <ProjectName>cloudblenddouble</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PCLX64_PATH)\3rdParty\Eigen\include;$(PCLX64_PATH)\3rdParty\Boost\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libboost_system-vc100-mt-1_47.lib;libboost_filesystem-vc100-mt-1_47.lib;libboost_thread-vc100-mt-1_47.lib;libboost_date_time-vc100-mt-1_47.lib;libboost_iostreams-vc100-mt-1_47.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(PCLX64_PATH)\3rdParty\Boost\lib</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PCLX64_PATH)\3rdParty\Eigen\include;$(PCLX64_PATH)\3rdParty\Boost\include;$(PCLX64_PATH)\3rdParty\FLANN\include;$(ProjectDir)trimesh2\include;$(OPENCV_PATH)\build\include;$(proj_api_path)\include\</AdditionalIncludeDirectories>
+      <AdditionalOptions>/Zm1025 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(PCLX64_PATH)\3rdParty\Boost\lib;$(ProjectDir)trimesh2\libx64;$(OPENCV_PATH)\build\x64\vc10\lib;$(proj_api_path)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libboost_system-vc100-mt-gd-1_47.lib;libboost_filesystem-vc100-mt-gd-1_47.lib;libboost_thread-vc100-mt-gd-1_47.lib;libboost_date_time-vc100-mt-gd-1_47.lib;libboost_iostreams-vc100-mt-gd-1_47.lib;trimeshd.lib;opencv_core248d.lib;opencv_flann248d.lib;proj.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PCLX64_PATH)\3rdParty\Eigen\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(PCLX64_PATH)\3rdParty\Boost\lib</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PCL_ROOT)\3rdParty\Eigen\include;$(PCL_ROOT)\3rdParty\Boost\include;$(PCL_ROOT)\3rdParty\FLANN\include;$(ProjectDir)trimesh2\include;$(OPENCV_PATH)\build\include;C:\libs\opencv_248\build\include;D:\gaojingmap\pointcloudblenddouble\PROJ\include</AdditionalIncludeDirectories>
+      <AdditionalOptions>/Zm1024 %(AdditionalOptions)</AdditionalOptions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>libboost_system-vc100-mt-1_47.lib;libboost_filesystem-vc100-mt-1_47.lib;libboost_thread-vc100-mt-1_47.lib;libboost_date_time-vc100-mt-1_47.lib;libboost_iostreams-vc100-mt-1_47.lib;trimesh.lib;opencv_core248.lib;opencv_flann248.lib;proj.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(PCL_ROOT)\3rdParty\Boost\lib;$(ProjectDir)trimesh2\libx64;C:\libs\PROJ\lib;C:\libs\opencv_248\build\x64\vc10\lib</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>LIBCPMT.lib</IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="calculate_feature.h" />
+    <ClInclude Include="channel_properties.h" />
+    <ClInclude Include="cloud_grid.h" />
+    <ClInclude Include="cloud_stamp_rot.h" />
+    <ClInclude Include="cmm_types.h" />
+    <ClInclude Include="concatenate.h" />
+    <ClInclude Include="conversions.h" />
+    <ClInclude Include="data_struct.h" />
+    <ClInclude Include="exception.h" />
+    <ClInclude Include="extraction_tree.h" />
+    <ClInclude Include="file_helper.h" />
+    <ClInclude Include="file_io_helper.h" />
+    <ClInclude Include="for_each_type.h" />
+    <ClInclude Include="kd_tree.h" />
+    <ClInclude Include="lzf.h" />
+    <ClInclude Include="macros.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="params.h" />
+    <ClInclude Include="pcd_helper.h" />
+    <ClInclude Include="pcl_config.h" />
+    <ClInclude Include="pcl_exports.h" />
+    <ClInclude Include="pcl_macros.h" />
+    <ClInclude Include="point_cloud.h" />
+    <ClInclude Include="point_cloud_closure.h" />
+    <ClInclude Include="point_cloud_helper.h" />
+    <ClInclude Include="point_cloud_revert.h" />
+    <ClInclude Include="point_cloud_spliter.h" />
+    <ClInclude Include="point_traits.h" />
+    <ClInclude Include="point_type.h" />
+    <ClInclude Include="process_status.h" />
+    <ClInclude Include="register_point_struct.h" />
+    <ClInclude Include="sensor_image.h" />
+    <ClInclude Include="sensor_point_cloud2.h" />
+    <ClInclude Include="sensor_point_field.h" />
+    <ClInclude Include="Static.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="string_helper.h" />
+    <ClInclude Include="voxel_grid.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="calculate_feature.cpp" />
+    <ClCompile Include="cloud_grid.cpp" />
+    <ClCompile Include="cloud_stamp_rot.cpp" />
+    <ClCompile Include="extraction_tree.cpp" />
+    <ClCompile Include="file_helper.cpp" />
+    <ClCompile Include="lzf.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="main_blend.cpp" />
+    <ClCompile Include="pcd_helper.cpp" />
+    <ClCompile Include="main_test.cpp" />
+    <ClCompile Include="point_cloud_closure.cpp" />
+    <ClCompile Include="point_cloud_helper.cpp" />
+    <ClCompile Include="point_cloud_revert.cpp" />
+    <ClCompile Include="point_cloud_spliter.cpp" />
+    <ClCompile Include="process_status.cpp" />
+    <ClCompile Include="Static.cpp" />
+    <ClCompile Include="stdafx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="string_helper.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
