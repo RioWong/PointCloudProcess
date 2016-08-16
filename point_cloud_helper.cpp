@@ -248,4 +248,35 @@ void PointCloudHelper::dpcd2fpcd(string str_path)
     }
 }
 
+void PointCloudHelper::remove_center_points(CloudPtr cloud, CloudPtr cloud_out, const Eigen::Matrix4d& rot, const double dis)
+{
+    const double dis2 = dis * dis;
+    bool compute_center = true;
+    Eigen::Vector4d center;
+    CloudItem center_point;
+    if (compute_center) {
+        compute3DCentroid(*cloud, center);
+    } else {
+        center = rot.block<4, 1>(0, 3);
+    }
+
+    center_point.x = center[0];
+    center_point.y = center[1];
+    center_point.z = center[2];
+
+    CloudPtr cloud_temp_out(new Cloud);
+    for (int i = 0; i < cloud->size(); ++i) {
+        const CloudItem& point = cloud->points[i];
+        if (std::abs(point.x - center[0]) > dis || std::abs(point.y - center[1]) > dis ||
+            std::abs(point.z - center[2]) > dis) {
+            cloud_temp_out->push_back(point);
+            continue;
+        }
+        if (point_dis2(point, center_point) >  dis2) {
+            cloud_temp_out->push_back(point);
+        }
+    }
+    *cloud_out = *cloud_temp_out;
+}
+
 CLOUD_BLEND_DOUBLE_NAMESPACE_END

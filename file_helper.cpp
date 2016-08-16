@@ -638,4 +638,17 @@ bool FileHelper::load_file_rot_icp_hdmap(const string file_path, vector<CloudSta
     return true;
 }
 
+bool FileHelper::copy_to_file_subfix(const std::string& file_path, const std::string& subfix)
+{
+    namespace fs = boost::filesystem;
+    fs::path pos_file(file_path);
+    fs::path pos_dir = pos_file.parent_path();
+    fs::path file_name = pos_file.filename().replace_extension();
+    fs::path backup_pos_file = pos_dir / (file_name.string() + "_" + subfix + pos_file.extension().string());
+    if (fs::exists(pos_file) && fs::is_regular_file(pos_file)) {
+        fs::copy_file(pos_file, backup_pos_file, fs::copy_option::overwrite_if_exists);
+    }
+    return true;
+}
+
 CLOUD_BLEND_DOUBLE_NAMESPACE_END

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>--mode split --in_dir_src Z:\201607015_test\diff\base_pcd --in_file_base_pose Z:\201607015_test\diff\base_pcd\119_base.log --in_file_frame_pose Z:\201607015_test\diff\base_pcd\119_base.log --out_dir Z:\201607015_test\diff\base_pcd_split_win\ --out_file_pose Z:\201607015_test\diff\base_pcd_split_win_test\new_pose.log --out_file_stamp Z:\201607015_test\diff\base_pcd_split_win_test\stamp.log</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>cloudblenddouble.exe --mode convert --in_pose_log "Z:\386\linux\pos_loop.log" --in_start_pcd "Z:\386\pcd\19564.pcd" --in_end_pcd "Z:\386\pcd\20066.pcd" --center_point "0,0,0" --out_pcd "Z:\386\linux\386_convert.pcd"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

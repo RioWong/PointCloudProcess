@@ -88,8 +88,7 @@ void PointCloudClosure::get_overlap_stamp(const vector<CloudStampRot> &rots, vec
         vector<double> distance_sqr;
         const PointC& cur_p = cloud_d_rots->points[i];
         const uint64_t cur_stamp = cur_p.stamp;
-        int length = kd_tree.radiusSearch(cur_p, 1.5, index, distance_sqr);
-        bool is_find = false;
+        int length = kd_tree.radiusSearch(cur_p, 10, index, distance_sqr);        bool is_find = false;
         int find_index = -1;
 
         for (int j = 0; j < length; j++) {
@@ -107,11 +106,26 @@ void PointCloudClosure::get_overlap_stamp(const vector<CloudStampRot> &rots, vec
 
             double a1 = cur_p.angle_z;
             double a2 = cloud_d_rots->points[index[j]].angle_z;
-            double d_angle = std::min(std::abs(a1 - a2), std::abs(a1 + a2 - 360));
+            double d_angle = std::abs(a1 - a2);
+            //double d_angle = std::min(std::abs(a1 - a2), std::abs(a1 + a2 - 360));
 
             if (d_angle >= 20.0f) {
                 continue;
             }
+
+			//求沿行驶方向上的水平距离不能超过1.5
+			double avg_angle = (a1 + a2) / 2.0;
+			avg_angle -= 90;
+			avg_angle = avg_angle/180.0*M_PI;
+			double k = tan(avg_angle);
+			//直线ax+by+c=0
+			double b= cur_p.y-k*cur_p.x;
+			double dis=std::abs(0-k*cloud_d_rots->points[index[j]].x + cloud_d_rots->points[index[j]].y - b)/std::sqrt(k*k+1);
+			if (dis>1.5)
+			{
+                cout<<cur_stamp  << "<--->" << cloud_d_rots->points[index[j]].stamp << " dis=" << dis << " > 1.5"<<endl;
+				continue;
+			}
 
             is_find = true;
             find_index = index[j];
@@ -337,6 +351,10 @@ int PointCloudClosure::main(const closure_params &params)
         cout << "base start " << base_start_stamp << " base end " << base_end_stamp << endl;
         cout << "frame start " << frame_start_stamp << " frame end " << frame_end_stamp << endl;
 
+        if (minus_abs(frame_end_stamp, frame_start_stamp) < 10) {
+            continue;
+        }
+
         if (cleanup_pcd_in_dir(frame_split_path)) {
             cout << "pcd files in dir removed " << frame_split_path << endl;
         }
@@ -403,11 +421,7 @@ int PointCloudClosure::main(const closure_params &params)
 //            }
 //        }
 #if DEBUG_OUTPUT
-        if (boost::filesystem::exists(new_pose_file)) {
-            boost::filesystem::path src_file(new_pose_file);
-            boost::filesystem::path dst_file = src_file.parent_path() / (src_file.filename().replace_extension().string() + "_icp" + src_file.extension().string());
-            boost::filesystem::copy_file(src_file, dst_file);
-        }
+        FileHelper::copy_to_file_subfix(new_pose_file, "closure");
 #endif
 
         std::ofstream ofile;

@@ -45,7 +45,8 @@ struct split_params
         frame_rot_file(frame_rot_file),
         out_dir(out_dir),
         out_pose_file(out_pose_file),
-        out_stamp_file(out_stamp_file)
+        out_stamp_file(out_stamp_file),
+        is_set_stamp(false)
     {}
 };
 

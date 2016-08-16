@@ -17,10 +17,10 @@ const int GRID_DIS = 10;
 const bool is_rebuild_cache = true;
 
 CloudGrid::CloudGrid()
-        : _idx(0),
+        : _hash_key_base_x(0),
+        _hash_key_base_y(0),
         _is_first_call_add(true),
-        _hash_key_base_x(0),
-        _hash_key_base_y(0)
+        _idx(0)
 {
     //全局存储的点云量比较大,避免反复扩充大小影响性能.
     _grid.rehash(INIT_MAP_SIZE);
@@ -137,7 +137,7 @@ void CloudGrid::get_cloud_with_pos_short(CloudPtr& cloud_cache, Matrix4f cur_rot
 		cloud_cache->clear();
 		int idx=0;
 		std::list<CloudPtr>::iterator it = _qframe.end();
-		it--;
+	    --it;
 		for (; it != _qframe.begin() && idx < frame_size; -- it,idx++)  
 		{  
 			CloudPtr& item=*it;
@@ -150,7 +150,7 @@ void CloudGrid::get_cloud_with_pos_short(CloudPtr& cloud_cache, Matrix4f cur_rot
 void CloudGrid::get_grid_cloud(CloudPtr& cloud){
     cloud->clear();
     for (unordered_map< MapKeyType, CloudGridItem>::iterator it = _grid.begin();
-        it != _grid.end(); it++) {
+        it != _grid.end(); ++it) {
         for (int i = 0; i < it->second.nodepoint.size(); i++) {
             cloud->push_back(it->second.nodepoint[i]);
         }
@@ -179,6 +179,19 @@ void CloudGrid::get_grid_cloud(CloudPtr src_cloud, CloudPtr src_cloud_out, Cloud
 		}
 		unordered_map<MapKeyType, set<int> >::iterator map_it = grid_index_map.find(key);
 		bool is_find = false;
+        // 过滤高度比较小的点云
+        if (true) {
+            double min_z = std::numeric_limits<double>::max();
+            double max_z = std::numeric_limits<double>::min();
+            for (int k = 0; k < it->second.nodepoint.size(); ++k) {
+                min_z = std::min(min_z, it->second.nodepoint[k].z);
+                max_z = std::max(max_z, it->second.nodepoint[k].z);
+            }
+            if (max_z - min_z < 1.5) {
+                //cout << "min_z " << min_z << " max_z " << max_z << endl;
+                continue;
+            }
+        }
 		for (int k = 0; k < it->second.nodepoint.size(); k++) {
 			if (is_2point_high_x(it->second.nodepoint[k], src_cloud->points[i],
 				dis_threshold)) {

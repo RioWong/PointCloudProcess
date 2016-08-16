@@ -43,6 +43,7 @@ public:
                                      const std::string& file_path, const Eigen::Matrix4d& trans, bool isAppend, std::string stamp);
     static void write_file_rot_hdmap(const std::string& file_path, const std::vector<CloudStampRot>& rots, bool isAppend);
     static bool load_file_rot_icp_hdmap(const std::string file_path, std::vector<CloudStampRot>& stamp_rots, std::string& proj_str);
+    static bool copy_to_file_subfix(const std::string& file_path, const std::string& subfix);
 private:
     static bool compare_func(boost::tuple<std::string, uint64_t, uint64_t> p1, boost::tuple<std::string, uint64_t, uint64_t> p2);
     static bool compare_func2(boost::tuple<std::string, uint64_t> p1, boost::tuple<std::string, uint64_t> p2);

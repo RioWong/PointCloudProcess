@@ -35,16 +35,6 @@ using Eigen::Matrix3f;
 using Eigen::Matrix4d;
 using Eigen::Vector3d;
 using boost::unordered_map;
-//using pcl::PointXYZ;
-//using pcl::PointCloud;
-//using pcl::KdTreeFLANN;
-
-const string CLOUD_NAME = "HDL";
-const float RDUMPLICATE_VALUE = 0.2f;
-const int processCacheMinNum = 5;
-const float LOOPOUTSIDE = 60;
-const float MAXTRACEDIS = 0.4f;
-const float MAX_WIDTH_CORNER = 5;
 
 ProcessStatus g_status;
 
@@ -86,7 +76,7 @@ void process_loop_icp(CloudPtr cloud_cache, CloudPtr cloud_tras, CloudPtr cloud_
     CloudStampRot& cur_cloud_stamp_rot = g_status._clouds_stamp_rot_line[cur_index];
     cout << "loop start stamp: " << cloud_tras->header.stamp << endl;
     g_status._frame_count_process++;
-    if (g_status._frame_count_process < g_status._num_start_frame_cache) {
+    if (g_status._frame_count_process < g_status._num_start_frame_cache / 2) {
         cout << "reg: frame ignore " << g_status._frame_count_process;
         process_update_rot_icp(cur_cloud_stamp_rot, Matrix4d::Zero(), cur_index, -1.0, icp_threshold);
         return;
@@ -116,8 +106,20 @@ void process_loop_icp(CloudPtr cloud_cache, CloudPtr cloud_tras, CloudPtr cloud_
     float icp_dis = PointCloudHelper::get_rot_icp(cloud_cache, cloud_tras, pair_transform, false, false);
     cout << "reg: icp ret: " << icp_dis << endl;
     cout << "reg: icp rot: " << endl << pair_transform << endl;
-    //io::savePCDFileBinary("D:\\base.pcd", *cloud_cache);
-    //io::savePCDFileBinary("D:\\frame.pcd", *cloud_tras);
+
+    // 调试ICP
+    //CloudPtr cloud_temp(new Cloud);
+    //stringstream ss;
+    //ss << "D:\\test\\" << timestamp;
+    //string prefix = ss.str();
+    //io::savePCDFileBinary(prefix + "_0.pcd", *cloud_cache);
+    //PointCloudHelper::dpcd2fpcd(prefix + "_0.pcd");
+    //io::savePCDFileBinary(prefix + "_1.pcd", *cloud_tras);
+    //PointCloudHelper::dpcd2fpcd(prefix + "_1.pcd");
+    //PointCloudHelper::transformPointCloud(*cloud_tras, *cloud_temp, pair_transform);
+    //io::savePCDFileBinary(prefix + "_2.pcd", *cloud_temp);
+    //PointCloudHelper::dpcd2fpcd(prefix + "_2.pcd");
+    //cout << "save done" << endl;
 #if DEBUG_VIEW
     // 测试输出显示
     if (true) {
@@ -164,7 +166,7 @@ void process_loop_icp(CloudPtr cloud_cache, CloudPtr cloud_tras, CloudPtr cloud_
     }
 }
 
-void on_get_hdl_cloud_for_reg(CloudPtr& cloud_temp_src)
+void on_get_hdl_cloud_for_reg(const int cloud_index)
 {
     //   CloudPtr cloud_tras=cloud;
     //CloudPtr cloud_temp_src=cloud;
@@ -172,6 +174,7 @@ void on_get_hdl_cloud_for_reg(CloudPtr& cloud_temp_src)
     double d_pitch = 0.0;
     double d_roll = 0.0;
     g_status._frame_count_total++;
+    CloudPtr cloud_temp_src = g_status._clouds_stamp_rot_line[cloud_index]._cloud_line;
     cout << "frame count " << g_status._frame_count_total << " cloud size " << cloud_temp_src->size() << " stamp " << cloud_temp_src->header.stamp << endl;
 
     //if (cloud->size() <= 10)
@@ -231,11 +234,11 @@ void on_get_hdl_cloud_for_reg(CloudPtr& cloud_temp_src)
     //       }
     //   }
     uint64_t cur_timestamp = cloud_temp_src->header.stamp;
-    int last_index = g_status._clouds_stamp_rot_line.size() - 1;
+    int last_index = cloud_index;
     CloudPtr cloud_temp(new Cloud);
-    *cloud_temp += *cloud_temp_src;
-    for (int i = -g_status._num_start_frame_cache; i < 0; i++) {
-        if (i + last_index < 0) {
+    //*cloud_temp += *cloud_temp_src;
+    for (int i = -g_status._num_start_frame_cache / 2; i < g_status._num_start_frame_cache / 2; i++) {
+        if (i + last_index < 0 || i + last_index >= g_status._clouds_stamp_rot_line.size()) {
             continue;
         }
         *cloud_temp += *g_status._clouds_stamp_rot_line[i + last_index]._cloud_line_src;
@@ -300,102 +303,78 @@ std::string get_pcd_filepath_from_stamp(std::string dir_path, uint64_t timestamp
     return (boost::filesystem::path(dir_path) / ss.str()).string();
 }
 
-void FindReliable(vector<Rot>& Rots, std::string plypath, float icp_threshold) //找可靠点，若该相邻两矩阵的中心点乘相邻矩阵后距离不远，则判定可靠
+CloudItem find_cloud_nearest_point_in_kdtree(CloudPtr cloud, KdTreeFLANN<CloudItem>& kdtree)
 {
+    //cout << cloud->size() << endl;
+    //cout << kdtree.getInputCloud()->size() << endl;
+    vector<int> pointIdxSearch;
+    vector<double> pointDistance;
+    CloudItem searchPoint;
+    double mix_dis = 9999;
+
+    for (int j = 0; j < cloud->size(); j++) {
+        int N = kdtree.nearestKSearch(cloud->points[j], 1, pointIdxSearch, pointDistance);
+        if (pointDistance[0] < mix_dis) {
+            mix_dis = pointDistance[0];
+            searchPoint = cloud->points[j];
+        }
+    }
+    //cout << searchPoint.x << " " << searchPoint.y << " " << searchPoint.z << endl;
+
+    return searchPoint;
+}
+
+void find_reliable(vector<Rot>& rots, std::string cloud_files_dir, float icp_threshold) //找可靠点，若该相邻两矩阵的中心点乘相邻矩阵后距离不远，则判定可靠
+{
+    const float dis_threshold = 0.06;
 #pragma omp parallel for
-    for (int i = 1; i < Rots.size() - 1; i++) {
+    for (int i = 1; i < rots.size() - 1; i++) {
+        if (!(rots[i].icperr >= 0 && rots[i].icperr <= icp_threshold && rots[i - 1].icperr >= 0 && rots[i + 1].icperr >= 0)) {
+            continue;
+        }
         //残差大于0小于0.13 
-        if (Rots[i].icperr >= 0 && Rots[i].icperr <= icp_threshold) {
-            //两边都是大于0的
-            if (Rots[i - 1].icperr >= 0 && Rots[i + 1].icperr >= 0) {
-                CloudItem leftpt, rightpt;
-                std::string leftply_path, rightply_path, centraply_path; //相邻ply
-                CloudItem minpt, maxpt;
-                CloudPtr left_cloud(new Cloud);
-                CloudPtr right_cloud(new Cloud);
-                CloudPtr centra_cloud(new Cloud);
-                leftply_path = get_pcd_filepath_from_stamp(plypath, Rots[i - 1].TimeStamp);
-                //stringstream path;
-                //int subply = Rots[i - 1].TimeStamp / 1000000;
-                //int ply = Rots[i - 1].TimeStamp - subply * 1000000;
-                //path << plypath << "\\" << subply << "_" << ply << ".ply";
-                //leftply_path = path.str();
-                io::loadPCDFile(leftply_path, *left_cloud); //加载三份ply
-                //path.clear();
-                //path.str("");
-                //subply = Rots[i + 1].TimeStamp / 1000000;
-                //ply = Rots[i + 1].TimeStamp - subply * 1000000;
-                //path << plypath << "\\" << subply << "_" << ply << ".ply";
-                //rightply_path = path.str();
-                rightply_path = get_pcd_filepath_from_stamp(plypath, Rots[i + 1].TimeStamp);
-                io::loadPCDFile(rightply_path, *right_cloud);
-                //path.clear();
-                //path.str("");
-                //subply = Rots[i].TimeStamp / 1000000;
-                //ply = Rots[i].TimeStamp - subply * 1000000;
-                //path << plypath << "\\" << subply << "_" << ply << ".ply";
-                //centraply_path = path.str();
-                centraply_path = get_pcd_filepath_from_stamp(plypath, Rots[i].TimeStamp);
-                cloud_blend_double::io::loadPCDFile(centraply_path, *centra_cloud);
+        //两边都是大于0的
+        CloudPtr left_cloud(new Cloud);
+        CloudPtr right_cloud(new Cloud);
+        CloudPtr centra_cloud(new Cloud);
 
-                KdTreeFLANN<CloudItem> kdtree;
-                //KdTree kdtree;
-                kdtree.setInputCloud(centra_cloud);
-                vector<int> pointIdxSearch;//存储邻域点的点号;
-                vector<double> pointDistance;//存储邻域点到搜索点的距离;
-                CloudItem searchPoint;//搜索点;
-                double mix_dis = 9999;
+        // 加载前一个点云
+        string leftply_path = get_pcd_filepath_from_stamp(cloud_files_dir, rots[i - 1].TimeStamp);
+        io::loadPCDFile(leftply_path, *left_cloud);
 
-                for (int j = 0; j < left_cloud->size(); j++) {
-                    int N = kdtree.nearestKSearch(left_cloud->points[j], 1, pointIdxSearch, pointDistance);
-                    if (pointDistance[0] < mix_dis) {
-                        mix_dis = pointDistance[0];
-                        searchPoint = left_cloud->points[j];
-                    }
-                }
+        // 加载后一个点云
+        string rightply_path = get_pcd_filepath_from_stamp(cloud_files_dir, rots[i + 1].TimeStamp);
+        io::loadPCDFile(rightply_path, *right_cloud);
 
-                leftpt.x = searchPoint.x;
-                leftpt.y = searchPoint.y;
-                leftpt.z = searchPoint.z;
-                CloudItem _leftpt, _rightpt;
-                _leftpt.getVector4dMap() = Rots[i - 1]._matrix * leftpt.getVector4dMap();
-                _rightpt.getVector4dMap() = Rots[i]._matrix * leftpt.getVector4dMap();
-                double dis_left = PointCloudHelper::point_dis2(_leftpt, _rightpt);
-                //double dis_left = Getdis(_leftpt, _rightpt);
+        // 加载当前点云
+        string centraply_path = get_pcd_filepath_from_stamp(cloud_files_dir, rots[i].TimeStamp);
+        io::loadPCDFile(centraply_path, *centra_cloud);
 
-                //算右边
-                pointIdxSearch.clear();
-                pointDistance.clear();
-                mix_dis = 9999;
-                for (int j = 0; j < right_cloud->size(); j++) {
-                    int N = kdtree.nearestKSearch(right_cloud->points[j], 1, pointIdxSearch, pointDistance);
-                    if (pointDistance[0] < mix_dis) {
-                        mix_dis = pointDistance[0];
-                        searchPoint = right_cloud->points[j];
-                    }
-                }
+        KdTreeFLANN<CloudItem> kdtree;
+        kdtree.setInputCloud(centra_cloud);
 
-                rightpt.x = searchPoint.x;
-                rightpt.y = searchPoint.y;
-                rightpt.z = searchPoint.z;
-                _leftpt.getVector4dMap() = Rots[i]._matrix * rightpt.getVector4dMap();
-                _rightpt.getVector4dMap() = Rots[i + 1]._matrix * rightpt.getVector4dMap();
-                double dis_right = PointCloudHelper::point_dis2(_leftpt, _rightpt);
+        // 前一个点云计算
+        //cout << "left" << endl;
+        CloudItem leftpt = find_cloud_nearest_point_in_kdtree(left_cloud, kdtree);
+        CloudItem trans_left_pt;
+        CloudItem trans_right_pt;
+        trans_left_pt.getVector4dMap() = rots[i - 1]._matrix * leftpt.getVector4dMap();
+        trans_right_pt.getVector4dMap() = rots[i]._matrix * leftpt.getVector4dMap();
+        double dis_left = PointCloudHelper::point_dis2(trans_left_pt, trans_right_pt);
+
+        // 后一个点云计算
+        //cout << "right" << endl;
+        CloudItem rightpt = find_cloud_nearest_point_in_kdtree(right_cloud, kdtree);
+        trans_left_pt.getVector4dMap() = rots[i]._matrix * rightpt.getVector4dMap();
+        trans_right_pt.getVector4dMap() = rots[i + 1]._matrix * rightpt.getVector4dMap();
+        double dis_right = PointCloudHelper::point_dis2(trans_left_pt, trans_right_pt);
+
+        // 两边连接处距离都小于0.06
+        if (dis_left < dis_threshold && dis_right < dis_threshold) {
 #if DEBUG_OUTPUT
-                cout << dis_left << " " << dis_right << " " << i << endl;
+            cout << rots[i].TimeStamp << " " << dis_left << " " << dis_right << endl;
 #endif
-                /*   cout<<Rots[i].TimeStamp<<" "<<dis<<endl;*/
-                float dis_threshold = 0.06;
-                //两边连接处距离都小于0.06
-                if (dis_left < dis_threshold && dis_right < dis_threshold) {
-#if DEBUG_OUTPUT
-                    cout << dis_left << " " << dis_right << " " << Rots[i].TimeStamp << endl;
-#endif
-                    //Rots[i].icperr=0.0;                       //icp err赋值为0，表示可靠
-                    Rots[i].is_valid = true;
-                }
-
-            }
+            rots[i].is_valid = true;
         }
     }
 }
@@ -619,11 +598,31 @@ int process_mode_pos(const vector<string>& files_pt_base, const vector<string>& 
                                        rot, true, d_cur_cloud_stamp_rot._stamp);
             g_status._global_transform = rot;
         } else {
-            on_get_hdl_cloud_for_reg(cloud_src);
+            int cur_process_index = g_status._clouds_stamp_rot_line.size() - 1 - g_status._num_start_frame_cache / 2;
+            if (cur_process_index < 0) {
+                continue;
+            }
+            on_get_hdl_cloud_for_reg(cur_process_index);
+            //on_get_hdl_cloud_for_reg(cloud_src);
         }
         //CloudGrid::instance().add_cloud(cloud_temp);
         //清空不使用的点云
         g_status.clear_cloud_line_cache(30);
+    }
+    for (int i = g_status._clouds_stamp_rot_line.size() - g_status._num_start_frame_cache / 2; i < g_status._clouds_stamp_rot_line.size(); i++) {
+        const uint64_t timestamp = g_status._clouds_stamp_rot_line[i]._cloud_line->header.stamp;
+        int cur_index = g_status.get_cloud_rot_index_with_stamp(timestamp);
+        if (cur_index < 0) {
+            cout << "reg: timestamp not found " << timestamp << endl;
+            // ignore
+            continue;
+        }
+
+        CloudStampRot& cur_cloud_stamp_rot = g_status._clouds_stamp_rot_line[cur_index];
+        cout << "loop start stamp: " << timestamp << endl;
+        g_status._frame_count_process++;
+        cout << "reg: frame ignore " << g_status._frame_count_process;
+        process_update_rot_icp(cur_cloud_stamp_rot, Matrix4d::Zero(), cur_index, -1.0, 1000);
     }
     /*if (g_status._clouds_line.size() == 0) {
         cout << "pcap文件没有数据，疑似损坏" << endl;
@@ -636,6 +635,354 @@ int process_mode_pos(const vector<string>& files_pt_base, const vector<string>& 
     //pcl::io::savePCDFile(g_status._pcap_file + "_loopsrc.pcd",
     //                     *g_status._cloud_result, false);
     return 0;
+}
+
+// 在 g_status._clouds_stamp_rot_line 中对(start_index, end_index)区间的点云做大块ICP
+void do_mul_frame_icp(
+    const boost::unordered_map<uint64_t, string>& stamp_filename_map,
+    const uint64_t cur_timestamp,
+    const int start_index,
+    const int end_index,
+    const boost::filesystem::path& output_path,
+    const int valid_count,
+    const bool is_do_sep_icp,
+    const bool is_mul_seg,
+    const bool is_shaft_filter)
+{
+    const int length = end_index - start_index + 1;
+
+    // 前后分别加载valid的帧数
+    //const int valid_count = 4;
+#if DEBUG_OUTPUT
+    cout << "start mul-frame ICP scale affine, length: " << length - 2 << endl;
+    cout << "load mid" << endl;
+#endif
+    vector<uint64_t> update_rot_stamp;
+    CloudPtr frame_cloud(new Cloud);
+    vector<string> frame_files;
+    for (int i = start_index + 1; i < end_index; i++) {
+        const uint64_t timestamp = g_status._clouds_stamp_rot_line[i]._stamp;
+        unordered_map<unsigned long long, string>::const_iterator find_it = stamp_filename_map.find(timestamp);
+        if (find_it == stamp_filename_map.end()) {
+            continue;
+        }
+        string file = find_it->second;
+#if DEBUG_OUTPUT
+        cout << "find ply " << file << endl;
+#endif
+        frame_files.push_back(file);
+        update_rot_stamp.push_back(timestamp);
+        //CloudPtr temp_cloud(new Cloud);
+        //pcl::io::loadPLYFile(file, *temp_cloud);
+        //*frame_cloud += *temp_cloud;
+    }
+
+#if DEBUG_OUTPUT
+    cout << "load front" << endl;
+#endif
+    // 向前搜索
+    int k = 0;
+    int l = start_index;
+    int last_valid_index = -1;
+    do {
+        if (l < 0) {
+            break;
+        }
+        const float icp_value = g_status._clouds_stamp_rot_line[l]._value_icp;
+        if (icp_value > 0 && icp_value < g_status.min_icp_threshold) {
+            k++;
+            if (last_valid_index < g_status._clouds_stamp_rot_line.size() && last_valid_index != l + 1) {
+                k = 0;
+            }
+            last_valid_index = l;
+        }
+        const uint64_t timestamp = g_status._clouds_stamp_rot_line[l]._stamp;
+        l--;
+        unordered_map<uint64_t, string>::const_iterator find_it = stamp_filename_map.find(timestamp);
+        if (find_it == stamp_filename_map.end()) {
+            continue;
+        }
+        string file = find_it->second;
+#if DEBUG_OUTPUT
+        cout << "find ply " << file << endl;
+#endif
+        frame_files.push_back(file);
+        update_rot_stamp.push_back(timestamp);
+        //CloudPtr temp_cloud(new Cloud);
+        //pcl::io::loadPLYFile(file, *temp_cloud);
+        //*frame_cloud += *temp_cloud;
+    }
+    while (k < valid_count);
+#if DEBUG_OUTPUT
+    cout << "load back" << endl << endl;
+#endif
+    // 向后搜索
+    last_valid_index = -1;
+    k = 0;
+    l = end_index;
+    do {
+        if (l >= g_status._clouds_stamp_rot_line.size()) {
+            break;
+        }
+        const float icp_value = g_status._clouds_stamp_rot_line[l]._value_icp;
+        if (icp_value > 0 && icp_value < g_status.min_icp_threshold) {
+            k++;
+            if (last_valid_index >= 0 && last_valid_index != l - 1) {
+                k = 0;
+            }
+            last_valid_index = l;
+        }
+        const uint64_t timestamp = g_status._clouds_stamp_rot_line[l]._stamp;
+        l++;
+        unordered_map<uint64_t, string>::const_iterator find_it = stamp_filename_map.find(timestamp);
+        if (find_it == stamp_filename_map.end()) {
+            continue;
+        }
+        string file = find_it->second;
+#if DEBUG_OUTPUT
+        cout << "find ply " << file << endl;
+#endif
+        frame_files.push_back(file);
+        update_rot_stamp.push_back(timestamp);
+        //CloudPtr temp_cloud(new Cloud);
+        //pcl::io::loadPLYFile(file, *temp_cloud);
+        //*frame_cloud += *temp_cloud;
+    }
+    while (k < valid_count);
+#if DEBUG_OUTPUT
+    cout << endl;
+#endif
+
+    vector<CloudPtr> frame_cloud_vec(frame_files.size());
+#pragma omp parallel for
+    for (int i = 0; i < frame_files.size(); i++) {
+#if DEBUG_OUTPUT
+        cout << "load ply" << frame_files[i] << endl;
+#endif
+        frame_cloud_vec[i] = boost::make_shared<Cloud>();
+        io::loadPCDFile(frame_files[i], *frame_cloud_vec[i]);
+        frame_cloud_vec[i]->header.stamp = update_rot_stamp[i];
+    }
+
+    for (int i = 0; i < frame_cloud_vec.size(); i++) {
+        *frame_cloud += *frame_cloud_vec[i];
+    }
+    //frame_cloud_vec.clear();
+
+    PointCloudHelper::change_cloud_rgb(frame_cloud, 255, 0, 0);
+    PointCloudHelper::remove_duplicate(frame_cloud, 0.04);
+    if (is_shaft_filter) {
+        cout << "shaft filter" << endl;
+        shaft_filter(frame_cloud, frame_cloud);
+    }
+    //PointCloudHelper::remove_outlier(frame_cloud,10);
+
+    CloudPtr cache_cloud(new Cloud);
+    if (!is_mul_seg) {
+        CloudItem min_xyz;
+        CloudItem max_xyz;
+        PointCloudHelper::getMinMax3D(*frame_cloud, min_xyz, max_xyz);
+        float d_length = 30;
+        min_xyz.x -= d_length;
+        min_xyz.y -= d_length;
+        min_xyz.z -= d_length;
+        max_xyz.x += d_length;
+        max_xyz.y += d_length;
+        max_xyz.z += d_length;
+        CloudGrid::instance().get_cloud_with_pos(cache_cloud,
+            min_xyz, max_xyz);
+    } else {
+        CloudGrid::instance().get_grid_cloud(frame_cloud, frame_cloud, cache_cloud, 1.0);
+    }
+    cout << "frame_cloud->size() " << frame_cloud->size() << endl;
+    cout << "cache_cloud->size() " << cache_cloud->size() << endl;
+#if DEBUG_VIEW
+    CloudPtr overall_cloud_ori(new Cloud);
+    *overall_cloud_ori += *cache_cloud;
+    *overall_cloud_ori += *frame_cloud;
+    PclPairVisualizer::instance()._pv->setCameraPose(
+        frame_cloud->points[0].x, frame_cloud->points[0].y, frame_cloud->points[0].z + 20, 
+        frame_cloud->points[0].x, frame_cloud->points[0].y, frame_cloud->points[0].z, 
+        0, 0, 0);
+    PclPairVisualizer::instance()._pv->registerKeyboardCallback(keyboard_callback);
+    PclPairVisualizer::instance().update_cloud_left(overall_cloud_ori);
+    if (g_status._is_debug_mode) {
+        PclPairVisualizer::instance().spin();
+    } else {
+        PclPairVisualizer::instance().spin_once();
+    }
+#endif
+
+    CloudPtr overall_cloud_out(new Cloud);
+    Matrix4d rot = Matrix4d::Identity();
+    float dis = PointCloudHelper::get_rot_icp(cache_cloud, frame_cloud, rot, true, false);
+#if DEBUG_OUTPUT
+    cout << dis << endl;
+    cout << rot << endl;
+    CloudPtr trans_cloud(new Cloud);
+    CloudPtr trans_split_cloud(new Cloud);
+    CloudPtr overall_cloud_final(new Cloud);
+    PointCloudHelper::transformPointCloud(*frame_cloud, *trans_cloud, rot);
+    *overall_cloud_final += *trans_cloud;
+    *overall_cloud_final += *cache_cloud;
+
+    // debug文件夹, 若不存在则建立
+    boost::filesystem::path output_debug_path = output_path / "debug";
+    if (!boost::filesystem::exists(output_debug_path) || !boost::filesystem::is_directory(output_debug_path)) {
+        boost::filesystem::create_directories(output_debug_path);
+    }
+    stringstream ss;
+    ss << cur_timestamp;
+    boost::filesystem::path prefix_path = output_debug_path / ss.str();
+    cout << "saving debug file " << prefix_path.string() + "_0.pcd" << endl;
+    cout << "cache_cloud->size() " << cache_cloud->size() << endl;
+    io::savePCDFile(prefix_path.string() + "_0.pcd", *cache_cloud);
+
+    cout << "saving debug file " << prefix_path.string() + "_1.pcd" << endl;
+    cout << "frame_cloud->size() " << frame_cloud->size() << endl;
+    io::savePCDFile(prefix_path.string() + "_1.pcd", *frame_cloud);
+
+    cout << "saving debug file " << prefix_path.string() + "_2.pcd" << endl;
+    cout << "trans_cloud->size() " << trans_cloud->size() << endl;
+    io::savePCDFile(prefix_path.string() + "_2.pcd", *trans_cloud);
+#endif
+    for (int i = 0; i < update_rot_stamp.size(); i++) {
+        CloudStampRot& cloud_rot = g_status.get_cloud_rot_with_stamp(update_rot_stamp[i]);
+        Matrix4d final_rot = rot;
+        if (is_do_sep_icp) {
+            CloudPtr cloud_src;
+            bool is_find_cloud = false;
+            for (int i1 = 0; i1 < frame_files.size(); i1++) {
+                if (frame_cloud_vec[i1]->header.stamp == update_rot_stamp[i]) {
+                    cloud_src = frame_cloud_vec[i1];
+                    is_find_cloud = true;
+                    break;
+                }
+            }
+            if (!is_find_cloud) {
+                cout << "cannot find corres-stamp " << cloud_src->header.stamp << endl;
+                continue;
+            }
+            //pcl::transformPointCloud(*cloud_rot._cloud_line_src,*cloud_temp,rot);
+            Matrix4d rot_split = Matrix4d::Identity();
+            CloudPtr cloud_temp(new Cloud);
+            PointCloudHelper::transformPointCloud(*cloud_src, *cloud_temp, rot);
+            //PointCloudHelper::remove_center_points(cloud_temp, cloud_temp, Matrix4d::Identity(), 15.0);
+            CloudPtr cache_cloud_temp(new Cloud);
+            //CloudGrid::instance().get_grid_cloud(cloud_temp, cloud_temp, cache_cloud_temp, 0.30);
+            //CloudGrid::instance().get_grid_cloud(cloud_temp, cloud_temp, cache_cloud_temp, 0.30);
+            CloudItem min_xyz;
+            CloudItem max_xyz;
+            PointCloudHelper::getMinMax3D(*cloud_temp, min_xyz, max_xyz);
+            float d_length = 3;
+            min_xyz.x -= d_length;
+            min_xyz.y -= d_length;
+            min_xyz.z -= d_length;
+            max_xyz.x += d_length;
+            max_xyz.y += d_length;
+            max_xyz.z += d_length;
+            CloudGrid::instance().get_cloud_with_pos(cache_cloud_temp,
+                min_xyz, max_xyz);
+            if (cache_cloud_temp->size() > 0) {
+                dis = PointCloudHelper::get_rot_icp(cache_cloud_temp, cloud_temp, rot_split, false, false);
+            } else {
+                dis = -2;
+            }
+#if DEBUG_OUTPUT
+            stringstream ss_each_icp;
+            ss_each_icp << prefix_path.string() << "_4_" << i;
+            if (cache_cloud_temp->size() > 0) {
+                io::savePCDFileBinary(ss_each_icp.str() + "_0.pcd", *cache_cloud_temp);
+            }
+            if (cloud_temp->size() > 0) {
+                io::savePCDFileBinary(ss_each_icp.str() + "_1.pcd", *cloud_temp);
+            }
+            cout << "******split*****" << endl;
+            cout << dis << endl;
+            cout << rot_split << endl;
+            PointCloudHelper::transformPointCloud(*cloud_temp,*cloud_temp,rot_split);
+            if (cloud_temp->size() > 0) {
+                io::savePCDFileBinary(ss_each_icp.str() + "_2.pcd", *cloud_temp);
+            }
+            *trans_split_cloud+=*cloud_temp;
+#endif
+            final_rot = rot_split * rot;
+        }
+        cloud_rot._rot = final_rot;
+    }
+    frame_cloud_vec.clear();
+#if DEBUG_OUTPUT
+    if (is_do_sep_icp) {
+        io::savePCDFileBinary(prefix_path.string() + "_3.pcd", *trans_split_cloud);
+    }
+#endif
+#if DEBUG_VIEW
+    PclPairVisualizer::instance().update_cloud_right(overall_cloud_final);
+    if (g_status._is_debug_mode) {
+        PclPairVisualizer::instance().spin();
+    } else {
+        PclPairVisualizer::instance().spin_once();
+    }
+#endif
+
+    //for (int i = cur_index + 1; i < end_index; i++) {
+    //    g_status._clouds_stamp_rot_line[i]._rot = rot;
+    //}
+}
+
+// 对 clouds_stamp_rot_line 的(start_index, end_index) 区间进行球面插值 插值为end_index和start_index
+void do_transform_interpolation(vector<CloudStampRot>& clouds_stamp_rot_line, int start_index, int end_index)
+{
+    const int length = end_index - start_index + 1;
+#if DEBUG_OUTPUT
+    cout << "start lum-elch, length: " << length - 2 << endl;
+#endif
+    // 如果连续1-4帧都是invalid，则进行误差分配
+    boost::shared_array<double> weights(new double[length]);
+    for (size_t i = 0; i < length; i++) {
+        weights[i] = double(i) / (length - 1);
+    }
+
+    Eigen::Matrix4d base_rot = clouds_stamp_rot_line[start_index]._rot;
+
+    Eigen::Matrix4d pair_transform = clouds_stamp_rot_line[end_index]._rot * base_rot.inverse();
+
+    // 误差分配(差分)
+    Eigen::Matrix4d loop_transform_double = pair_transform;
+    Eigen::Affine3d bl(loop_transform_double);
+    Eigen::Quaterniond q(bl.rotation());
+    Eigen::Matrix3d eps_mat
+        = loop_transform_double.block<3, 3>(0, 0) * bl.rotation().inverse() - Eigen::Matrix3d::Identity();
+    for (size_t i = start_index; i <= end_index; i++) {
+        Eigen::Matrix3d scale_mat = Eigen::Matrix3d::Identity();
+        scale_mat += weights[i - start_index] * eps_mat;
+        Eigen::Vector3d t2;
+        t2[0] = weights[i - start_index] * loop_transform_double(0, 3);
+        t2[1] = weights[i - start_index] * loop_transform_double(1, 3);
+        t2[2] = weights[i - start_index] * loop_transform_double(2, 3);
+
+        Eigen::Quaterniond q2 = Eigen::Quaterniond::Identity().slerp(weights[i - start_index], q);
+
+        Eigen::Translation3d t3(t2);
+        Eigen::Affine3d a(t3 * q2);
+        Eigen::Matrix4d each_trans_mat = Eigen::Matrix4d::Identity();
+        each_trans_mat = a * each_trans_mat;
+        each_trans_mat.block<3, 3>(0, 0) = scale_mat * each_trans_mat.block<3, 3>(0, 0);
+
+        // 差分矩阵
+        Eigen::Matrix4d d_pair_transform = each_trans_mat;
+        Eigen::Matrix4d res = d_pair_transform * base_rot;
+        //cout << d_pair_transform << endl;
+        //cout << res << endl;
+        //cout << endl;
+        clouds_stamp_rot_line[i]._rot = res;
+    } // 误差分配for
+}
+
+void iterative_mean(double& average, const double num, const int index)
+{
+    double index_1 = static_cast<double>(index + 1);
+    average = average * static_cast<double>(index) / index_1 + num / index_1;
 }
 
 int process_mode_loop(
@@ -653,10 +1000,7 @@ int process_mode_loop(
     //加载历史rot
     //FileHelper::load_file_rot(g_status._pcap_file, map_clouds_rot,
     //                          map_clouds_rot_stamps);
-    bool is_write_pose = false;
-    if (g_status._clouds_stamp_rot_line.size() > 0) {
-        is_write_pose = true;
-    } else {
+    if (g_status._clouds_stamp_rot_line.size() == 0) {
         CloudGrid::instance().clear();
         vector<CloudPtr> cloud_bases(files_pt_base.size());
         cout << "preparing data..." << endl;
@@ -670,13 +1014,9 @@ int process_mode_loop(
 
             //PointCloudHelper::point_cloud_feature_filter(cloud_temp, cloud_temp);
             // 更改颜色
-            PointCloudHelper::change_cloud_rgb(cloud_temp, 255, 255, 255);
+            //PointCloudHelper::change_cloud_rgb(cloud_temp, 255, 255, 255);
             PointCloudHelper::remove_duplicate(cloud_temp, 0.04);
             cloud_bases[i] = cloud_temp;
-            //#pragma omp critical
-            //			{
-            //				CloudGrid::instance().add_cloud_internal(cloud_temp);		
-            //			}
         }
         CloudPtr cloud_base_temp(new Cloud);
         for (int i = 0; i < cloud_bases.size(); ++i) {
@@ -717,7 +1057,7 @@ int process_mode_loop(
 #if DEBUG_OUTPUT
         cout << "icp threshold " << g_status.min_icp_threshold << endl;
 #endif
-        FindReliable(rot_vec, dir_pt_frame, g_status.min_icp_threshold);
+        find_reliable(rot_vec, dir_pt_frame, g_status.min_icp_threshold);
 
         // 将孤立的valid设置为invalid
         for (int i = 1; i < rot_vec.size() - 1; i++) {
@@ -766,13 +1106,54 @@ int process_mode_loop(
                 break;
             }
         }
-        if (first_none_zero_index > 0) {
+        if (first_none_zero_index > 20) {
+            do_mul_frame_icp(stamp_filename_map, g_status._clouds_stamp_rot_line[0]._stamp, -1, first_none_zero_index, output_path, 4, false, true, true);
+        } else if (first_none_zero_index > 0) {
+            //int count = 0;
+            //Eigen::Matrix<double, 7, 1> average_vec = Eigen::Matrix<double, 7, 1>::Zero();
+            //do {
+            //    const Matrix4d& cur_rot = g_status._clouds_stamp_rot_line[first_none_zero_index + count]._rot;
+            //    if (cur_rot == Matrix4d::Zero()) {
+            //        continue;
+            //    }
+            //    Eigen::Affine3d a(cur_rot);
+            //    Eigen::Translation3d t(a.translation());
+            //    Eigen::Quaterniond q(a.rotation());
+            //    iterative_mean(average_vec(0), q.w(), count);
+            //    iterative_mean(average_vec(1), q.x(), count);
+            //    iterative_mean(average_vec(2), q.y(), count);
+            //    iterative_mean(average_vec(3), q.z(), count);
+            //    iterative_mean(average_vec(4), t.x(), count);
+            //    iterative_mean(average_vec(5), t.y(), count);
+            //    iterative_mean(average_vec(6), t.z(), count);
+            //    //average_vec(0) = average_vec(0) * count / double(count + 1) + q.w();
+            //    //average_vec(1) = q.x();
+            //    //average_vec(2) = q.y();
+            //    //average_vec(3) = q.z();
+            //    //average_vec(4) = a.translation()(0);
+            //    //average_vec(5) = a.translation()(1);
+            //    //average_vec(6) = a.translation()(2);
+            //    ++count;
+            //}
+            //while (count < 10);
+            //Eigen::Quaterniond average_q(average_vec(0), average_vec(1), average_vec(2), average_vec(3));
+            //average_q.normalize();
+            //Eigen::Translation3d average_t(average_vec(4), average_vec(5), average_vec(6));
+            //Matrix4d average_rot = Eigen::Affine3d(average_t * average_q) * Matrix4d::Identity();
+            //// 将开始所有零矩阵都赋值为第一个非零矩阵的值
+            //for (int j = 0; j < first_none_zero_index; j++) {
+            //    CloudStampRot& cur_stamp_rot = g_status._clouds_stamp_rot_line[j];
+            //    cur_stamp_rot._rot = average_rot;
+            //    //cur_stamp_rot._rot = g_status._clouds_stamp_rot_line[first_none_zero_index]._rot;
+            //}
+
             // 将开始所有零矩阵都赋值为第一个非零矩阵的值
             for (int j = 0; j < first_none_zero_index; j++) {
                 CloudStampRot& cur_stamp_rot = g_status._clouds_stamp_rot_line[j];
                 cur_stamp_rot._rot = g_status._clouds_stamp_rot_line[first_none_zero_index]._rot;
             }
         }
+
         int last_none_zero_index = -1;
         for (int j = g_status._clouds_stamp_rot_line.size() - 1; j >= 0; j--) {
             int cur_index = j;
@@ -831,289 +1212,13 @@ int process_mode_loop(
             // 差分
             int length = end_index - cur_index + 1;
             const int max_invalid_count = 5;
-            // 前后分别加载valid的帧数
-            const int valid_count = 4;
 
             if (length >= max_invalid_count + 2) {
                 // 如果连续5帧都是invalid，则进行大范围的ICP scale affine配准
-#if DEBUG_OUTPUT
-                cout << "start mul-frame ICP scale affine, length: " << length - 2 << endl;
-                cout << "load mid" << endl;
-#endif
-                vector<uint64_t> update_rot_stamp;
-                CloudPtr frame_cloud(new Cloud);
-                vector<string> frame_files;
-                for (int i = cur_index + 1; i < end_index; i++) {
-                    const uint64_t timestamp = g_status._clouds_stamp_rot_line[i]._stamp;
-                    unordered_map<uint64_t, string>::iterator find_it = stamp_filename_map.find(timestamp);
-                    if (find_it == stamp_filename_map.end()) {
-                        continue;
-                    }
-                    string file = find_it->second;
-#if DEBUG_OUTPUT
-                    cout << "find ply " << file << endl;
-#endif
-                    frame_files.push_back(file);
-                    update_rot_stamp.push_back(timestamp);
-                    //CloudPtr temp_cloud(new Cloud);
-                    //pcl::io::loadPLYFile(file, *temp_cloud);
-                    //*frame_cloud += *temp_cloud;
-                }
-
-#if DEBUG_OUTPUT
-                cout << "load front" << endl;
-#endif
-                // 向前搜索
-                int k = 0;
-                int l = cur_index;
-                int last_valid_index = -1;
-                do {
-                    if (l < 0) {
-                        break;
-                    }
-                    const float icp_value = g_status._clouds_stamp_rot_line[l]._value_icp;
-                    if (icp_value > 0 && icp_value < g_status.min_icp_threshold) {
-                        k++;
-                        if (last_valid_index < g_status._clouds_stamp_rot_line.size() && last_valid_index != l + 1) {
-                            k = 0;
-                        }
-                        last_valid_index = l;
-                    }
-                    const uint64_t timestamp = g_status._clouds_stamp_rot_line[l]._stamp;
-                    l--;
-                    unordered_map<uint64_t, string>::iterator find_it = stamp_filename_map.find(timestamp);
-                    if (find_it == stamp_filename_map.end()) {
-                        continue;
-                    }
-                    string file = find_it->second;
-#if DEBUG_OUTPUT
-                    cout << "find ply " << file << endl;
-#endif
-                    frame_files.push_back(file);
-                    update_rot_stamp.push_back(timestamp);
-                    //CloudPtr temp_cloud(new Cloud);
-                    //pcl::io::loadPLYFile(file, *temp_cloud);
-                    //*frame_cloud += *temp_cloud;
-                }
-                while (k < valid_count);
-#if DEBUG_OUTPUT
-                cout << "load back" << endl << endl;
-#endif
-                // 向后搜索
-                last_valid_index = -1;
-                k = 0;
-                l = end_index;
-                do {
-                    if (l >= g_status._clouds_stamp_rot_line.size()) {
-                        break;
-                    }
-                    const float icp_value = g_status._clouds_stamp_rot_line[l]._value_icp;
-                    if (icp_value > 0 && icp_value < g_status.min_icp_threshold) {
-                        k++;
-                        if (last_valid_index >= 0 && last_valid_index != l - 1) {
-                            k = 0;
-                        }
-                        last_valid_index = l;
-                    }
-                    const uint64_t timestamp = g_status._clouds_stamp_rot_line[l]._stamp;
-                    l++;
-                    unordered_map<uint64_t, string>::iterator find_it = stamp_filename_map.find(timestamp);
-                    if (find_it == stamp_filename_map.end()) {
-                        continue;
-                    }
-                    string file = find_it->second;
-#if DEBUG_OUTPUT
-                    cout << "find ply " << file << endl;
-#endif
-                    frame_files.push_back(file);
-                    update_rot_stamp.push_back(timestamp);
-                    //CloudPtr temp_cloud(new Cloud);
-                    //pcl::io::loadPLYFile(file, *temp_cloud);
-                    //*frame_cloud += *temp_cloud;
-                }
-                while (k < valid_count);
-#if DEBUG_OUTPUT
-                cout << endl;
-#endif
-
-                vector<CloudPtr> frame_cloud_vec(frame_files.size());
-#pragma omp parallel for
-                for (int i = 0; i < frame_files.size(); i++) {
-#if DEBUG_OUTPUT
-                    cout << "load ply" << frame_files[i] << endl;
-#endif
-                    frame_cloud_vec[i] = boost::make_shared<Cloud>();
-                    io::loadPCDFile(frame_files[i], *frame_cloud_vec[i]);
-                    frame_cloud_vec[i]->header.stamp = update_rot_stamp[i];
-                }
-
-                for (int i = 0; i < frame_cloud_vec.size(); i++) {
-                    *frame_cloud += *frame_cloud_vec[i];
-                }
-                //frame_cloud_vec.clear();
-
-                PointCloudHelper::change_cloud_rgb(frame_cloud, 255, 0, 0);
-                PointCloudHelper::remove_duplicate(frame_cloud, 0.04);
-                //PointCloudHelper::remove_outlier(frame_cloud,10);
-
-                cout << "frame_cloud->size() " << frame_cloud->size() << endl;
-
-                CloudPtr cache_cloud(new Cloud);
-                CloudItem min_xyz;
-                CloudItem max_xyz;
-                PointCloudHelper::getMinMax3D(*frame_cloud, min_xyz, max_xyz);
-                float d_length = 30;
-                min_xyz.x -= d_length;
-                min_xyz.y -= d_length;
-                min_xyz.z -= d_length;
-                max_xyz.x += d_length;
-                max_xyz.y += d_length;
-                max_xyz.z += d_length;
-                CloudGrid::instance().get_cloud_with_pos(cache_cloud,
-                                                         min_xyz, max_xyz);
-                cout << "cache_cloud->size() " << cache_cloud->size() << endl;
-#if DEBUG_VIEW
-                CloudPtr overall_cloud_ori(new Cloud);
-                *overall_cloud_ori += *cache_cloud;
-                *overall_cloud_ori += *frame_cloud;
-                PclPairVisualizer::instance()._pv->setCameraPose(
-                    frame_cloud->points[0].x, frame_cloud->points[0].y, frame_cloud->points[0].z + 20, 
-                    frame_cloud->points[0].x, frame_cloud->points[0].y, frame_cloud->points[0].z, 
-                    0, 0, 0);
-                PclPairVisualizer::instance()._pv->registerKeyboardCallback(keyboard_callback);
-                PclPairVisualizer::instance().update_cloud_left(overall_cloud_ori);
-                if (g_status._is_debug_mode) {
-                    PclPairVisualizer::instance().spin();
-                } else {
-                    PclPairVisualizer::instance().spin_once();
-                }
-#endif
-
-                CloudPtr overall_cloud_out(new Cloud);
-                Matrix4d rot = Matrix4d::Identity();
-                float dis = PointCloudHelper::get_rot_icp(cache_cloud, frame_cloud, rot, true, false);
-#if DEBUG_OUTPUT
-                cout << dis << endl;
-                cout << rot << endl;
-                CloudPtr trans_cloud(new Cloud);
-                CloudPtr trans_split_cloud(new Cloud);
-                CloudPtr overall_cloud_final(new Cloud);
-                PointCloudHelper::transformPointCloud(*frame_cloud, *trans_cloud, rot);
-                *overall_cloud_final += *trans_cloud;
-                *overall_cloud_final += *cache_cloud;
-
-                // debug文件夹, 若不存在则建立
-                boost::filesystem::path output_debug_path = output_path / "debug";
-                if (!boost::filesystem::exists(output_debug_path) || !boost::filesystem::is_directory(output_debug_path)) {
-                    boost::filesystem::create_directories(output_debug_path);
-                }
-                stringstream ss;
-                ss << cur_stamp_rot._stamp;
-                boost::filesystem::path prefix_path = output_debug_path / ss.str();
-                cout << "saving debug file " << prefix_path.string() + "_0.pcd" << endl;
-                cout << "cache_cloud->size() " << cache_cloud->size() << endl;
-                io::savePCDFile(prefix_path.string() + "_0.pcd", *cache_cloud);
-
-                cout << "saving debug file " << prefix_path.string() + "_1.pcd" << endl;
-                cout << "frame_cloud->size() " << frame_cloud->size() << endl;
-                io::savePCDFile(prefix_path.string() + "_1.pcd", *frame_cloud);
-
-                cout << "saving debug file " << prefix_path.string() + "_2.pcd" << endl;
-                cout << "trans_cloud->size() " << trans_cloud->size() << endl;
-                io::savePCDFile(prefix_path.string() + "_2.pcd", *trans_cloud);
-#endif
-                for (int i = 0; i < update_rot_stamp.size(); i++) {
-                    CloudStampRot& cloud_rot = g_status.get_cloud_rot_with_stamp(update_rot_stamp[i]);
-                    CloudPtr cloud_temp(new Cloud);
-                    CloudPtr cloud_src(new Cloud);
-                    cloud_src->header.stamp = 0;
-                    for (int k = 0; k < frame_files.size(); k++) {
-                        if (frame_cloud_vec[k]->header.stamp == update_rot_stamp[i]) {
-                            cloud_src = frame_cloud_vec[k];
-                        }
-                    }
-                    if (cloud_src->header.stamp == 0) {
-                        cout << "cannot find corres-stamp " << cloud_src->header.stamp << endl;
-                        continue;
-                    }
-                    //pcl::transformPointCloud(*cloud_rot._cloud_line_src,*cloud_temp,rot);
-                    Matrix4d rot_split;
-                    PointCloudHelper::transformPointCloud(*cloud_src, *cloud_temp, rot);
-                    CloudPtr cache_cloud_temp(new Cloud);
-                    CloudGrid::instance().get_grid_cloud(cloud_temp, cloud_temp, cache_cloud_temp, 0.20);
-                    dis = PointCloudHelper::get_rot_icp(cache_cloud_temp, cloud_temp, rot_split, false, false);
-#if DEBUG_OUTPUT
-                    io::savePCDFileBinary(prefix_path.string() + "_4.pcd", *cache_cloud_temp);
-                    cout << "******split*****" << endl;
-                    cout << dis << endl;
-                    cout << rot_split << endl;
-                    PointCloudHelper::transformPointCloud(*cloud_temp,*cloud_temp,rot_split);
-                    *trans_split_cloud+=*cloud_temp;
-#endif
-                    rot_split = rot_split * rot;
-                    cloud_rot._rot = rot_split;
-                }
-                frame_cloud_vec.clear();
-#if DEBUG_OUTPUT
-                io::savePCDFileBinary(prefix_path.string() + "_3.pcd", *trans_split_cloud);
-#endif
-#if DEBUG_VIEW
-                PclPairVisualizer::instance().update_cloud_right(overall_cloud_final);
-                if (g_status._is_debug_mode) {
-                    PclPairVisualizer::instance().spin();
-                } else {
-                    PclPairVisualizer::instance().spin_once();
-                }
-#endif
-
-                //for (int i = cur_index + 1; i < end_index; i++) {
-                //    g_status._clouds_stamp_rot_line[i]._rot = rot;
-                //}
+                do_mul_frame_icp(stamp_filename_map, cur_stamp_rot._stamp, cur_index, end_index, output_path, 4, true, false, false);
             } else {
                 if (true) {
-#if DEBUG_OUTPUT
-                    cout << "start lum-elch, length: " << length - 2 << endl;
-#endif
-                    // 如果连续1-4帧都是invalid，则进行误差分配
-                    boost::shared_array<double> weights(new double[length]);
-                    for (size_t i = 0; i < length; i++) {
-                        weights[i] = double(i) / (length - 1);
-                    }
-
-                    Eigen::Matrix4d base_rot = cur_stamp_rot._rot;
-
-                    Eigen::Matrix4d pair_transform = g_status._clouds_stamp_rot_line[end_index]._rot * base_rot.inverse();
-
-                    // 误差分配(差分)
-                    Eigen::Matrix4d loop_transform_double = pair_transform;
-                    Eigen::Affine3d bl(loop_transform_double);
-                    Eigen::Quaterniond q(bl.rotation());
-                    Eigen::Matrix3d eps_mat
-                        = loop_transform_double.block<3, 3>(0, 0) * bl.rotation().inverse() - Eigen::Matrix3d::Identity();
-                    for (size_t i = cur_index; i <= end_index; i++) {
-                        Eigen::Matrix3d scale_mat = Eigen::Matrix3d::Identity();
-                        scale_mat += weights[i - cur_index] * eps_mat;
-                        Eigen::Vector3d t2;
-                        t2[0] = weights[i - cur_index] * loop_transform_double(0, 3);
-                        t2[1] = weights[i - cur_index] * loop_transform_double(1, 3);
-                        t2[2] = weights[i - cur_index] * loop_transform_double(2, 3);
-
-                        Eigen::Quaterniond q2 = Eigen::Quaterniond::Identity().slerp(weights[i - cur_index], q);
-
-                        Eigen::Translation3d t3(t2);
-                        Eigen::Affine3d a(t3 * q2);
-                        Eigen::Matrix4d each_trans_mat = Eigen::Matrix4d::Identity();
-                        each_trans_mat = a * each_trans_mat;
-                        each_trans_mat.block<3, 3>(0, 0) = scale_mat * each_trans_mat.block<3, 3>(0, 0);
-
-                        // 差分矩阵
-                        Eigen::Matrix4d d_pair_transform = each_trans_mat;
-                        Eigen::Matrix4d res = d_pair_transform * base_rot;
-                        //cout << d_pair_transform << endl;
-                        //cout << res << endl;
-                        //cout << endl;
-                        g_status._clouds_stamp_rot_line[i]._rot = res;
-                    } // 误差分配for
+                    do_transform_interpolation(g_status._clouds_stamp_rot_line, cur_index, end_index);
                 } else {
                     // 直接使用前一帧的矩阵代替
                     for (size_t i = cur_index + 1; i < end_index; i++) {
@@ -1139,6 +1244,9 @@ int process_mode_loop(
     if (!(boost::filesystem::exists(output_path) && boost::filesystem::is_directory(output_path))) {
         boost::filesystem::create_directories(output_path);
     }
+#if DEBUG_OUTPUT
+    FileHelper::copy_to_file_subfix(g_status._pcap_file, "pos");
+#endif
     for (size_t i = 0; i < files_pt_frame.size(); ++i) {
 
         boost::filesystem3::path temp_path(files_pt_frame[i]);
@@ -1151,10 +1259,11 @@ int process_mode_loop(
         }
 
         // 目的生成文件如果存在则跳过
-        std::string save_file_temp = (output_path / (boost::format("0_%1%.pcd") % index).str()).string();
-        if (boost::filesystem::exists(save_file_temp)) {
-            continue;
-        }
+        // 先注释掉
+        //std::string save_file_temp = (output_path / (boost::format("0_%1%.pcd") % index).str()).string();
+        //if (boost::filesystem::exists(save_file_temp)) {
+        //    continue;
+        //}
         if (last_index == -1) {
             last_index = index;
         }
@@ -1170,8 +1279,6 @@ int process_mode_loop(
 
 
         if (map_clouds_rot_stamps.find(timestamp) == map_clouds_rot_stamps.end()) {
-            //				cout<<"无法找到对应的时间戳,场景结束 stamp"<<timestamp<<endl;
-            //				return 1;
             cout << "cannot find coress-stamp, skip stamp" << timestamp << endl;
             continue;
         }
@@ -1183,14 +1290,8 @@ int process_mode_loop(
 #if DEBUG_OUTPUT
         cout << files_pt_frame[i] << endl;
         cout << rot << endl;
-        boost::filesystem::path pos_file(g_status._pcap_file);
-        boost::filesystem::path pos_dir = pos_file.parent_path();
-        boost::filesystem::path file_name = pos_file.filename().replace_extension();
-        string final_pos_file = (pos_dir / (file_name.string() + "_final" + pos_file.extension().string())).string();
-        FileHelper::write_file_rot(i, final_pos_file, rot, i != 0, timestamp);
-#else
-        FileHelper::write_file_rot(i, g_status._pcap_file, rot, i != 0, timestamp);
 #endif
+        FileHelper::write_file_rot(i, g_status._pcap_file, rot, i != 0, timestamp);
 
         CloudPtr cloud_res(new Cloud());
         PointCloudHelper::transformPointCloud(*cloud_temp, *cloud_res, rot);
@@ -1203,18 +1304,11 @@ int process_mode_loop(
         cloud_output->clear();
     }
     vector<CloudStampRot> rots;
-#if !DEBUG_OUTPUT
     FileHelper::load_file_rot_icp(g_status._pcap_file, rots);
-    generate_origin_poselog(slice_stamp_file, output_pose_log, rots, converted_pose_log);
-#else
-    boost::filesystem::path pos_file(output_pose_log);
-    boost::filesystem::path pos_dir = pos_file.parent_path();
-    boost::filesystem::path file_name = pos_file.filename().replace_extension();
-    string new_pose_file = (pos_dir / (file_name.string() + "_pose" + pos_file.extension().string())).string();
-    string final_pos_file = (pos_dir / (file_name.string() + "_final" + pos_file.extension().string())).string();
-    FileHelper::load_file_rot_icp(final_pos_file, rots);
-    generate_origin_poselog(slice_stamp_file, new_pose_file, rots, converted_pose_log);
+#if DEBUG_OUTPUT
+    FileHelper::copy_to_file_subfix(g_status._pcap_file, "loop");
 #endif
+    generate_origin_poselog(slice_stamp_file, output_pose_log, rots, converted_pose_log);
     return 0;
 }
 
@@ -1244,12 +1338,14 @@ int main_blend(const enumModeProcess current_mode, const blend_params& params)
         g_status._current_mode = current_mode;
         dir_pt_base = params.base_dir;
         dir_pt_frame = params.frame_dir;
-        g_status._pcap_file = params.out_pose_file;
         output_path = params.cloud_dir;
         g_status.min_icp_threshold = params.min_icp_threshold;
         slice_stamp_file = params.stamp_file;
         converted_pose_log = params.in_pose_file;
+
+        // output_pose_log 与 g_status._pcap_file 等同
         output_pose_log = params.out_pose_file;
+        g_status._pcap_file = params.out_pose_file;
         if (!(boost::filesystem::exists(output_path) && boost::filesystem::is_directory(output_path))){
             boost::filesystem::create_directories(output_path);
         }

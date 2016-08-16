@@ -34,6 +34,7 @@ bool check_params_unique_valid(
             return false;
         }
     }
+    return true;
 }
 
 void display_help_message(
@@ -135,7 +136,8 @@ int run_blend_command(int argc, char** argv, const boost::program_options::optio
                 is_same_direction,
                 icp_threshold,
                 cache_frame_num);
-        int ret = CLOUD_BLEND_DOUBLE_NAMESPACE::main_blend(CLOUD_BLEND_DOUBLE_NAMESPACE::ENUM_MODE_PROCESS_POS, params);
+        int ret = 0;
+        ret = CLOUD_BLEND_DOUBLE_NAMESPACE::main_blend(CLOUD_BLEND_DOUBLE_NAMESPACE::ENUM_MODE_PROCESS_POS, params);
         if (ret != 0) {
             return ret;
         }

@@ -68,6 +68,9 @@ int PointCloudRevert::main(const convert_params& params)
                 is_find = true;
                 for (int j = 0; j < cloud->size(); j++) {
                     cloud->points[j].getVector4fMap() = rots[i]._rot.cast<float>() * cloud->points[j].getVector4fMap();
+                    cloud->points[j].x = std::fmod(cloud->points[j].x,7000);
+                    cloud->points[j].y = std::fmod(cloud->points[j].y,7000);
+                    cloud->points[j].z = std::fmod(cloud->points[j].z,7000);
                 }
                 break;
             }

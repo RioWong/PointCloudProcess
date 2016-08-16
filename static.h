@@ -11,5 +11,6 @@
 CLOUD_BLEND_DOUBLE_NAMESPACE_BEGIN
 void tree_filter(CloudPtr src_cloud, CloudPtr dst_cloud);
 void ground_filter(CloudPtr src_cloud, CloudPtr dst_cloud);
+void shaft_filter(CloudPtr src_cloud, CloudPtr dst_cloud);
 
 CLOUD_BLEND_DOUBLE_NAMESPACE_END

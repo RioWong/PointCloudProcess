@@ -284,20 +284,20 @@ int PointCloudSpliter::main(const split_params & params)
     boost::filesystem::path base_rot_path_bf(base_rot_path);
     if (!boost::filesystem::exists(base_rot_path_bf))
     {
-        cout<<"error in fingding base_rot_file"<<endl;
+        cout<<"error in finding base_rot_file"<<endl;
         return 0;
     }
     boost::filesystem::path targ_rot_path_bf(targ_rot_path);
     if (!boost::filesystem::exists(targ_rot_path))
     {
-        cout<<"error in fingding frame_rot_file"<<endl;
+        cout<<"error in finding frame_rot_file"<<endl;
         return 0;
     }
     boost::filesystem::path out_pose_path_bf(out_pose_path);
     boost::filesystem::path out_pose_parent_path=out_pose_path_bf.parent_path();
     if (!boost::filesystem::exists(out_pose_parent_path))
     {
-        cout<<"error in fingding out_pose_dir,create one"<<endl;
+        cout<<"error in finding out_pose_dir,create one"<<endl;
         if(!boost::filesystem::create_directory(out_pose_parent_path))
         {
             cout<<"cannot create out_pose_dir"<<endl;
@@ -308,7 +308,7 @@ int PointCloudSpliter::main(const split_params & params)
     boost::filesystem::path out_stamp_parent_path=out_stamp_path_bf.parent_path();
     if (!boost::filesystem::exists(out_stamp_parent_path))
     {
-        cout<<"error in fingding out_stamp_dir,create one"<<endl;
+        cout<<"error in finding out_stamp_dir,create one"<<endl;
         if(!boost::filesystem::create_directory(out_stamp_parent_path))
         {
             cout<<"cannot create out_pose_dir"<<endl;
@@ -318,7 +318,7 @@ int PointCloudSpliter::main(const split_params & params)
     boost::filesystem::path out_path_bf(out_path);
     if (!boost::filesystem::exists(out_path_bf))
     {
-        cout<<"error in fingding out_dir,create one"<<endl;
+        cout<<"error in finding out_dir,create one"<<endl;
         if(!boost::filesystem::create_directory(out_path_bf))
         {
             cout<<"cannot create out_dir"<<endl;
@@ -381,6 +381,7 @@ int PointCloudSpliter::main(const split_params & params)
         start_stamp = params.start_stamp;
         end_stamp = params.end_stamp;
     }
+	cout<<"start_stamp " <<start_stamp<<" "<<end_stamp<<endl;
     split_pcd_by_log(pcd_path, out_path, out_stamp_path, stamp_rots, centra_point, start_stamp, end_stamp);
     cout<<"cloud split finished"<<endl;
     return 1;

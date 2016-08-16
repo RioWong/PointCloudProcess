@@ -230,6 +230,7 @@ public:
     }
     static void cloud_double2float(CloudPtr cloud_in, Cloud_FPtr cloud_out);
     static void dpcd2fpcd(std::string str_path);
+    static void remove_center_points(CloudPtr cloud, CloudPtr cloud_out, const Eigen::Matrix4d& rot, const double dis);
 
 private:
     static double point2plane_dis(double x0, double y0, double z0);
